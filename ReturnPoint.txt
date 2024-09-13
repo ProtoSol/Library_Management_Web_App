@@ -345,7 +345,7 @@ def main():
                 st.session_state['role'] = user['role'].values[0]
                 st.rerun()  # Reload the app to show the appropriate menu
             else:
-                st.error("Invalid username or password, or contact admin if you are an new user.")
+                st.error("Invalid username or password.")
     else:
         # Display subscription info in sidebar for users
         if st.session_state['role'] == 'user':
