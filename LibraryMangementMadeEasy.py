@@ -2,7 +2,7 @@ import streamlit as st
 import pandas as pd
 from datetime import datetime, timedelta
 
-# Initialize dataframes in session state if not already done
+# Initialize dataframes in session state if not already done at the start of the code.
 def init_dataframes():
     if 'books_df' not in st.session_state:
         st.session_state.books_df = pd.DataFrame({
@@ -53,7 +53,7 @@ def download_link(df, filename):
                        file_name=filename,
                        mime='text/csv')
 
-# Admin download options
+# Admin download options to obtain various information stored in the instance
 @role_required('admin')
 def admin_downloads():
     st.subheader("Download Data")
@@ -73,9 +73,10 @@ def admin_downloads():
 def add_item():
     st.subheader("Add New Book or Movie")
     item_type = st.selectbox("Select type", ['Book', 'Movie'])
+    # Logic to display the correct query question based on the selection of the admin.
     name = st.text_input(f"Enter {item_type} Name")
     author_or_director = st.text_input(f"Enter {'Author' if item_type == 'Book' else 'Director'} Name")
-    
+    # Usage of the one if condtion to update the correct dataframe.
     if st.button(f"Add {item_type}"):
         if name and author_or_director:
             df = st.session_state.books_df if item_type == 'Book' else st.session_state.movies_df
@@ -96,6 +97,7 @@ def add_item():
 def update_item():
     st.subheader("Update Existing Book or Movie")
     item_type = st.selectbox("Select type", ['Book', 'Movie'])
+    # Select the appropriate dataframe based on the selected item type
     df = st.session_state.books_df if item_type == 'Book' else st.session_state.movies_df
     name = st.selectbox(f"Select {item_type} to Update", df['name'])
     is_available = st.checkbox("Available", df.loc[df['name'] == name, 'available'].values[0])
@@ -288,8 +290,8 @@ def is_subscription_valid():
             return subscription_end >= datetime.now()
     return False
 
+# Get subscription info of the current user
 def get_subscription_info(username, user_df):
-    """Get the subscription end date and remaining days for a user."""
     user_data = user_df.loc[user_df['username'] == username]
     if user_data.empty:
         return None, None
@@ -302,8 +304,8 @@ def get_subscription_info(username, user_df):
     days_remaining = (subscription_end - datetime.now()).days
     return subscription_end, days_remaining
 
+# Format subscription info
 def format_subscription_info(subscription_end, days_remaining):
-    """Format subscription information for display."""
     if subscription_end is None:
         return "Subscription: No subscription"
     return (
@@ -311,16 +313,14 @@ def format_subscription_info(subscription_end, days_remaining):
         f"Days Remaining: {days_remaining}"
     )
 
-
-
 # Logout functionality
 def logout():
     st.session_state.clear()
     st.session_state['logged_out'] = True
-    st.rerun()
+    st.rerun() # as the experimental_rerun() was replaced with rerun()
 
 def main():
-    st.title("Library Management System")
+    st.title("Library Management Made Easy")
 
     # Initialize dataframes
     init_dataframes()
@@ -366,7 +366,7 @@ def main():
                 'View Items Availability', 
                 'Logout'
             ])
-
+            # Admin menu added here
             if menu == 'Manage Users':
                 manage_users()
             elif menu == 'Add Item':
@@ -391,6 +391,7 @@ def main():
                 'Logout'
             ])
 
+            # User menu added here
             if menu == 'Check Item Availability':
                 check_item_availability()
             elif menu == 'Issue Item':
@@ -400,6 +401,7 @@ def main():
             elif menu == 'Logout':
                 logout()
 
+# Run the app
 if __name__ == "__main__":
     main()
 
