@@ -181,10 +181,9 @@ def issue_item():
     df = st.session_state.books_df if item_type == 'Book' else st.session_state.movies_df
     name = st.selectbox(f"Select {item_type}", df[df['available']]['name'])
     issue_date = st.date_input("Issue Date", datetime.now())
-    return_date = issue_date + timedelta(days=7)  # Example return date, adjust as needed
-
+    return_date = issue_date + timedelta(days=7)
+    
     if st.button(f"Issue {item_type}"):
-        issue_df = st.session_state.issue_df
         new_issue = {
             'username': st.session_state['username'],
             'item_type': item_type,
@@ -193,7 +192,7 @@ def issue_item():
             'return_date': return_date,
             'status': 'Issued'
         }
-        issue_df = issue_df.append(new_issue, ignore_index=True)
+        issue_df = st.session_state.issue_df.append(new_issue, ignore_index=True)
         update_dataframe('issue_df', issue_df)
         
         # Mark the item as unavailable
@@ -202,6 +201,7 @@ def issue_item():
         
         st.success(f"{item_type} '{name}' issued successfully!")
 
+# Check subscription validity
 def is_subscription_valid():
     username = st.session_state.get('username')
     if username:
@@ -211,12 +211,23 @@ def is_subscription_valid():
             return pd.isna(subscription_end) or subscription_end >= datetime.now()
     return False
 
+# Logout functionality
+def logout():
+    st.session_state.clear()
+    st.session_state['logged_out'] = True
+    st.rerun()
+
 # Main function
 def main():
     st.title("Library Management System")
 
     # Initialize dataframes
     init_dataframes()
+
+    # Handle logout
+    if 'logged_out' in st.session_state and st.session_state['logged_out']:
+        st.session_state['logged_out'] = False
+        st.rerun()
 
     # Check if user is logged in
     if 'username' not in st.session_state:
@@ -237,7 +248,7 @@ def main():
     else:
         if st.session_state['role'] == 'admin':
             st.sidebar.title("Admin Menu")
-            menu = st.sidebar.radio("Select Menu", ['Manage Users', 'Add Item', 'Update Item', 'Admin Downloads', 'View Reports'])
+            menu = st.sidebar.radio("Select Menu", ['Manage Users', 'Add Item', 'Update Item', 'Admin Downloads', 'View Reports', 'Logout'])
 
             if menu == 'Manage Users':
                 manage_users()
@@ -249,10 +260,12 @@ def main():
                 admin_downloads()
             elif menu == 'View Reports':
                 view_reports()
+            elif menu == 'Logout':
+                logout()
 
         elif st.session_state['role'] == 'user':
             st.sidebar.title("User Menu")
-            menu = st.sidebar.radio("Select Menu", ['Check Item Availability', 'Issue Item', 'View Reports'])
+            menu = st.sidebar.radio("Select Menu", ['Check Item Availability', 'Issue Item', 'View Reports', 'Logout'])
 
             if menu == 'Check Item Availability':
                 check_item_availability()
@@ -260,6 +273,8 @@ def main():
                 issue_item()
             elif menu == 'View Reports':
                 view_reports()
+            elif menu == 'Logout':
+                logout()
 
 if __name__ == "__main__":
     main()
