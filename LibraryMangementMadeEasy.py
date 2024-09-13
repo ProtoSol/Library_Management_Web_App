@@ -116,7 +116,8 @@ def manage_users():
 
     if action == 'Add User' and st.button("Add User"):
         if username and password:
-            df = df.append({'username': username, 'password': password, 'role': role}, ignore_index=True)
+            new_user = pd.DataFrame([{'username': username, 'password': password, 'role': role}])
+            df = pd.concat([df, new_user], ignore_index=True)
             update_dataframe('user_df', df)
             st.success(f"User '{username}' added successfully!")
         else:
