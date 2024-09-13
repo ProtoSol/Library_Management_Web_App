@@ -20,9 +20,10 @@ def init_dataframes():
 
     if 'user_df' not in st.session_state:
         st.session_state.user_df = pd.DataFrame({
-            'username': ['admin', 'user1', 'user2'],
-            'password': ['adminpass', 'user1pass', 'user2pass'],
-            'role': ['admin', 'user', 'user']
+            'username': ['admin', 'user1', 'user2', 'john_doe', 'jane_smith', 'alice_jones'],
+            'password': ['adminpass', 'user1pass', 'user2pass', 'johnpass', 'janepass', 'alicepass'],
+            'role': ['admin', 'user', 'user', 'user', 'user', 'user'],
+            'subscription_end': [pd.NaT, datetime.now() + timedelta(days=30), datetime.now() + timedelta(days=90), datetime.now() + timedelta(days=60), pd.NaT, datetime.now() + timedelta(days=365)]
         })
 
     if 'issue_df' not in st.session_state:
@@ -111,12 +112,18 @@ def manage_users():
     username = st.text_input("Username")
     password = st.text_input("Password")
     role = st.selectbox("Role", ['admin', 'user'])
-    
+    subscription_duration = st.selectbox("Subscription Duration", ['None', '1 Month', '3 Months', '6 Months', '1 Year'])
+
     df = st.session_state.user_df
 
     if action == 'Add User' and st.button("Add User"):
         if username and password:
-            new_user = pd.DataFrame([{'username': username, 'password': password, 'role': role}])
+            subscription_end = pd.NaT
+            if subscription_duration != 'None':
+                days_map = {'1 Month': 30, '3 Months': 90, '6 Months': 180, '1 Year': 365}
+                subscription_end = datetime.now() + timedelta(days=days_map[subscription_duration])
+                
+            new_user = pd.DataFrame([{'username': username, 'password': password, 'role': role, 'subscription_end': subscription_end}])
             df = pd.concat([df, new_user], ignore_index=True)
             update_dataframe('user_df', df)
             st.success(f"User '{username}' added successfully!")
@@ -125,7 +132,12 @@ def manage_users():
     
     if action == 'Update User' and st.button("Update User"):
         if username in df['username'].values:
-            df.loc[df['username'] == username, ['password', 'role']] = password, role
+            subscription_end = df.loc[df['username'] == username, 'subscription_end'].values[0]
+            if subscription_duration != 'None':
+                days_map = {'1 Month': 30, '3 Months': 90, '6 Months': 180, '1 Year': 365}
+                subscription_end = datetime.now() + timedelta(days=days_map[subscription_duration])
+                
+            df.loc[df['username'] == username, ['password', 'role', 'subscription_end']] = password, role, subscription_end
             update_dataframe('user_df', df)
             st.success(f"User '{username}' updated successfully!")
         else:
@@ -161,159 +173,93 @@ def check_item_availability():
 # Issue item (User only)
 def issue_item():
     st.subheader("Issue a Book or Movie")
+    if not is_subscription_valid():
+        st.error("Your subscription has expired or is not valid. Please purchase a subscription to issue items.")
+        return
+
     item_type = st.selectbox("Select type", ['Book', 'Movie'])
     df = st.session_state.books_df if item_type == 'Book' else st.session_state.movies_df
     name = st.selectbox(f"Select {item_type}", df[df['available']]['name'])
     issue_date = st.date_input("Issue Date", datetime.now())
-    return_date = issue_date + timedelta(days=15)
-    st.write(f"Return Date: {return_date}")
+    return_date = issue_date + timedelta(days=7)  # Example return date, adjust as needed
 
     if st.button(f"Issue {item_type}"):
         issue_df = st.session_state.issue_df
-        issue_df = issue_df.append({
+        new_issue = {
             'username': st.session_state['username'],
-            'item_name': name,
             'item_type': item_type,
+            'item_name': name,
             'issue_date': issue_date,
             'return_date': return_date,
             'status': 'Issued'
-        }, ignore_index=True)
+        }
+        issue_df = issue_df.append(new_issue, ignore_index=True)
         update_dataframe('issue_df', issue_df)
+        
+        # Mark the item as unavailable
         df.loc[df['name'] == name, 'available'] = False
         update_dataframe('books_df' if item_type == 'Book' else 'movies_df', df)
+        
         st.success(f"{item_type} '{name}' issued successfully!")
 
-# Return item (User only)
-def return_item():
-    st.subheader("Return Book or Movie")
-    user_issues = st.session_state.issue_df[(st.session_state.issue_df['username'] == st.session_state['username']) & (st.session_state.issue_df['status'] == 'Issued')]
-    if user_issues.empty:
-        st.error("You have no items to return.")
-        return
-    item_name = st.selectbox("Select Item to Return", user_issues['item_name'])
-    return_date = st.date_input("Return Date", datetime.now())
-    
-    if st.button("Return Item"):
-        issue_df = st.session_state.issue_df
-        issue_df.loc[(issue_df['username'] == st.session_state['username']) & (issue_df['item_name'] == item_name), 'status'] = 'Returned'
-        update_dataframe('issue_df', issue_df)
-        item_type = user_issues.loc[user_issues['item_name'] == item_name, 'item_type'].values[0]
-        df = st.session_state.books_df if item_type == 'Book' else st.session_state.movies_df
-        df.loc[df['name'] == item_name, 'available'] = True
-        update_dataframe('books_df' if item_type == 'Book' else 'movies_df', df)
-        st.success(f"'{item_name}' returned successfully!")
+def is_subscription_valid():
+    username = st.session_state.get('username')
+    if username:
+        user_data = st.session_state.user_df.loc[st.session_state.user_df['username'] == username]
+        if not user_data.empty:
+            subscription_end = user_data['subscription_end'].values[0]
+            return pd.isna(subscription_end) or subscription_end >= datetime.now()
+    return False
 
-# Fine payment (User only)
-def fine_payment():
-    st.subheader("Fine Payment")
-    today = datetime.now().date()
-    user_issues = st.session_state.issue_df[st.session_state.issue_df['username'] == st.session_state['username']]
-    
-    overdue_items = user_issues[
-        (user_issues['status'] == 'Issued') & 
-        (pd.to_datetime(user_issues['return_date']).dt.date < today)
-    ]
-    
-    if overdue_items.empty:
-        st.write("No fines due currently.")
-    else:
-        fine_rate = 1  # $1 per day
-        total_fine = 0
-        
-        st.write("Overdue Items:")
-        for _, item in overdue_items.iterrows():
-            days_overdue = (today - pd.to_datetime(item['return_date']).date()).days
-            item_fine = days_overdue * fine_rate
-            total_fine += item_fine
-            st.write(f"- {item['item_name']} (Due: {item['return_date']}): ${item_fine:.2f}")
-        
-        st.write(f"\nTotal Fine Due: ${total_fine:.2f}")
-        
-        if st.button("Pay Fine"):
-            for index in overdue_items.index:
-                st.session_state.issue_df.loc[index, 'status'] = 'Returned'
-            
-            update_dataframe('issue_df', st.session_state.issue_df)
-            st.success(f"Fine of ${total_fine:.2f} paid successfully. All overdue items marked as returned.")
-            
-            for _, item in overdue_items.iterrows():
-                df = st.session_state.books_df if item['item_type'] == 'Book' else st.session_state.movies_df
-                df.loc[df['name'] == item['item_name'], 'available'] = True
-                update_dataframe('books_df' if item['item_type'] == 'Book' else 'movies_df', df)
-
-# Main Application Logic
+# Main function
 def main():
     st.title("Library Management System")
+
+    # Initialize dataframes
     init_dataframes()
 
+    # Check if user is logged in
     if 'username' not in st.session_state:
-        st.session_state['username'] = None
-
-    if st.session_state['username'] is None:
-        # Login logic
         st.subheader("Login")
         username = st.text_input("Username")
         password = st.text_input("Password", type="password")
-        
-        if st.button("Login"):
-            user = st.session_state.user_df[(st.session_state.user_df['username'] == username) & (st.session_state.user_df['password'] == password)]
+        login_button = st.button("Login")
+
+        if login_button:
+            user = st.session_state.user_df[(st.session_state.user_df['username'] == username) & 
+                                            (st.session_state.user_df['password'] == password)]
             if not user.empty:
                 st.session_state['username'] = username
                 st.session_state['role'] = user['role'].values[0]
-                st.success(f"Logged in as {st.session_state['role']}.")
+                st.rerun()  # Reload the app to show the appropriate menu
             else:
-                # Check if the username exists in the user DataFrame
-                if username in st.session_state.user_df['username'].values:
-                    st.error("Incorrect password. Please try again.")
-                else:
-                    st.error("User not found. Please contact the admin to create an account.")
+                st.error("Invalid username or password.")
     else:
         if st.session_state['role'] == 'admin':
-            menu_admin()
+            st.sidebar.title("Admin Menu")
+            menu = st.sidebar.radio("Select Menu", ['Manage Users', 'Add Item', 'Update Item', 'Admin Downloads', 'View Reports'])
+
+            if menu == 'Manage Users':
+                manage_users()
+            elif menu == 'Add Item':
+                add_item()
+            elif menu == 'Update Item':
+                update_item()
+            elif menu == 'Admin Downloads':
+                admin_downloads()
+            elif menu == 'View Reports':
+                view_reports()
+
         elif st.session_state['role'] == 'user':
-            menu_user()
+            st.sidebar.title("User Menu")
+            menu = st.sidebar.radio("Select Menu", ['Check Item Availability', 'Issue Item', 'View Reports'])
 
-# Menu for Admin
-@role_required('admin')
-def menu_admin():
-    menu = st.sidebar.radio("Admin Menu", ['Add Item', 'Update Item', 'Manage Users', 'View Reports', 'Download Data', 'Transactions', 'Logout'])
-    
-    if menu == 'Add Item':
-        add_item()
-    elif menu == 'Update Item':
-        update_item()
-    elif menu == 'Manage Users':
-        manage_users()
-    elif menu == 'View Reports':
-        view_reports()
-    elif menu == 'Download Data':
-        admin_downloads()
-    elif menu == 'Transactions':
-        check_item_availability()
-    elif menu == 'Logout':
-        st.session_state['username'] = None
-        st.experimental_rerun()
-
-# Menu for User
-@role_required('user')
-def menu_user():
-    menu = st.sidebar.radio("User Menu", ['View Reports', 'Transactions', 'Logout'])
-    
-    if menu == 'View Reports':
-        view_reports()
-    elif menu == 'Transactions':
-        transaction_menu = st.selectbox("Select Transaction", ['Check Availability', 'Issue Item', 'Return Item', 'Fine Payment'])
-        if transaction_menu == 'Check Availability':
-            check_item_availability()
-        elif transaction_menu == 'Issue Item':
-            issue_item()
-        elif transaction_menu == 'Return Item':
-            return_item()
-        elif transaction_menu == 'Fine Payment':
-            fine_payment()
-    elif menu == 'Logout':
-        st.session_state['username'] = None
-        st.experimental_rerun()
+            if menu == 'Check Item Availability':
+                check_item_availability()
+            elif menu == 'Issue Item':
+                issue_item()
+            elif menu == 'View Reports':
+                view_reports()
 
 if __name__ == "__main__":
     main()
