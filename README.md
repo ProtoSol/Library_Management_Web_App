@@ -21,6 +21,10 @@ The Library Management System is a Streamlit-based application designed for mana
     - **Return Items:** Users can return previously issued items.
     - **Fine Payment:** Users can pay fines for overdue items.
 
+## Live Preview
+
+To view the live demo of the application, click [here](https://librarymanager.streamlit.app/).
+
 ## Installation
 
 To run the Library Management System, follow these steps:
