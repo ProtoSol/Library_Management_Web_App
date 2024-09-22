@@ -1,0 +1,8 @@
+username,password,role,subscription_end,fines
+admin,adminpass,admin,,0
+user1,user1pass,user,2024-10-22 12:49:43.094568,0
+user2,user2pass,user,2024-12-21 12:49:43.094568,0
+john_doe,johnpass,user,2024-11-21 12:49:43.094568,0
+jane_smith,janepass,user,,0
+alice_jones,alicepass,user,2025-09-22 12:49:43.094568,0
+proto,sol,admin,,0

@@ -1,38 +1,65 @@
 import streamlit as st
 import pandas as pd
+import os
 from datetime import datetime, timedelta
 
 # Initialize dataframes in session state if not already done at the start of the code.
 def init_dataframes():
-    if 'books_df' not in st.session_state:
+    # Check if CSV files exist and load them, otherwise initialize DataFrames
+    if not os.path.exists('books.csv'):
         st.session_state.books_df = pd.DataFrame({
             'name': ['1984', 'Brave New World', 'To Kill a Mockingbird', 'The Great Gatsby'],
             'author': ['George Orwell', 'Aldous Huxley', 'Harper Lee', 'F. Scott Fitzgerald'],
             'available': [True, True, False, True]
         })
+        st.session_state.books_df.to_csv('books.csv', index=False)  # Save initial state
 
-    if 'movies_df' not in st.session_state:
+    else:
+        st.session_state.books_df = pd.read_csv('books.csv')
+
+    if not os.path.exists('movies.csv'):
         st.session_state.movies_df = pd.DataFrame({
             'name': ['Inception', 'Interstellar', 'The Matrix', 'Parasite'],
             'director': ['Christopher Nolan', 'Christopher Nolan', 'Wachowski Brothers', 'Bong Joon-ho'],
             'available': [True, False, True, True]
         })
+        st.session_state.movies_df.to_csv('movies.csv', index=False)  # Save initial state
 
-    if 'user_df' not in st.session_state:
+    else:
+        st.session_state.movies_df = pd.read_csv('movies.csv')
+
+    if not os.path.exists('users.csv'):
         st.session_state.user_df = pd.DataFrame({
             'username': ['admin', 'user1', 'user2', 'john_doe', 'jane_smith', 'alice_jones'],
             'password': ['adminpass', 'user1pass', 'user2pass', 'johnpass', 'janepass', 'alicepass'],
             'role': ['admin', 'user', 'user', 'user', 'user', 'user'],
             'subscription_end': [pd.NaT, datetime.now() + timedelta(days=30), datetime.now() + timedelta(days=90), datetime.now() + timedelta(days=60), pd.NaT, datetime.now() + timedelta(days=365)],
-            'fines': [0, 0, 0, 0, 0, 0]  # Initialize fines
+            'fines': [0, 0, 0, 0, 0, 0]
         })
+        st.session_state.user_df.to_csv('users.csv', index=False)  # Save initial state
 
-    if 'issue_df' not in st.session_state:
+    else:
+        st.session_state.user_df = pd.read_csv('users.csv', parse_dates=['subscription_end'])
+
+    if not os.path.exists('issues.csv'):
         st.session_state.issue_df = pd.DataFrame(columns=['username', 'item_name', 'item_type', 'issue_date', 'return_date', 'status'])
+        st.session_state.issue_df.to_csv('issues.csv', index=False)
 
-# Update DataFrame in session state
+    else:
+        st.session_state.issue_df = pd.read_csv('issues.csv', parse_dates=['issue_date', 'return_date'])
+
+# Function to update the DataFrame and save to CSV after changes
 def update_dataframe(df_name, df):
     st.session_state[df_name] = df
+    # Save updated DataFrame to CSV
+    if df_name == 'books_df':
+        df.to_csv('books.csv', index=False)
+    elif df_name == 'movies_df':
+        df.to_csv('movies.csv', index=False)
+    elif df_name == 'user_df':
+        df.to_csv('users.csv', index=False)
+    elif df_name == 'issue_df':
+        df.to_csv('issues.csv', index=False)
 
 # Role check decorator
 def role_required(role):
@@ -76,32 +103,31 @@ def add_item():
     item_type = st.selectbox("Select item type:", ["Book", "Movie"])
     name = st.text_input(f"Enter {item_type} Name:")
     author_or_director = st.text_input(f"Enter {'Author' if item_type == 'Book' else 'Director'}:")
-    year = st.number_input("Enter Year:", min_value=1800, max_value=2100, step=1)
-    genre = st.text_input("Enter Genre:")
-    df = pd.DataFrame()
+
     if st.button(f"Add {item_type}"):
         if name == "" or author_or_director == "":
             st.error(f"Please fill out all required fields for the {item_type}.")
+        else:
             new_entry = {
                 'name': name,
-                'year': year,
-                'genre': genre
+                'available': True
             }
             if item_type == "Book":
                 new_entry['author'] = author_or_director
+                df = st.session_state.books_df
             else:
                 new_entry['director'] = author_or_director
-            df = pd.concat([df, pd.DataFrame([new_entry])], ignore_index=True)
-            update_dataframe('books_df' if item_type == 'Book' else 'movies_df')
-            st.success(f"{item_type} '{name}' added successfully!")
+                df = st.session_state.movies_df
 
+            df = pd.concat([df, pd.DataFrame([new_entry])], ignore_index=True)
+            update_dataframe('books_df' if item_type == 'Book' else 'movies_df', df)
+            st.success(f"{item_type} '{name}' added successfully!")
 
 # Update item (Admin only)
 @role_required('admin')
 def update_item():
     st.subheader("Update Existing Book or Movie")
     item_type = st.selectbox("Select type", ['Book', 'Movie'])
-    # Select the appropriate dataframe based on the selected item type
     df = st.session_state.books_df if item_type == 'Book' else st.session_state.movies_df
     name = st.selectbox(f"Select {item_type} to Update", df['name'])
     is_available = st.checkbox("Available", df.loc[df['name'] == name, 'available'].values[0])
@@ -370,7 +396,6 @@ def main():
                 'View Items Availability', 
                 'Logout'
             ])
-            # Admin menu added here
             if menu == 'Manage Users':
                 manage_users()
             elif menu == 'Add Item':
@@ -394,8 +419,6 @@ def main():
                 'View Reports', 
                 'Logout'
             ])
-
-            # User menu added here
             if menu == 'Check Item Availability':
                 check_item_availability()
             elif menu == 'Issue Item':
@@ -405,6 +428,5 @@ def main():
             elif menu == 'Logout':
                 logout()
 
-# Run the app
 if __name__ == "__main__":
     main()
