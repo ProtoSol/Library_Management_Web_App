@@ -70,11 +70,6 @@ def admin_downloads():
 
 # Add new item (Admin only)
 @role_required('admin')
-import pandas as pd
-import streamlit as st
-
-# Assume update_dataframe is already defined elsewhere in your code
-
 def add_item():
     st.subheader("Add New Item")
     # Dropdown to select the type of item to add (Book or Movie)
