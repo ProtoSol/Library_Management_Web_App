@@ -70,27 +70,36 @@ def admin_downloads():
 
 # Add new item (Admin only)
 @role_required('admin')
+import pandas as pd
+import streamlit as st
+
+# Assume update_dataframe is already defined elsewhere in your code
+
 def add_item():
-    st.subheader("Add New Book or Movie")
-    item_type = st.selectbox("Select type", ['Book', 'Movie'])
-    # Logic to display the correct query question based on the selection of the admin.
-    name = st.text_input(f"Enter {item_type} Name")
-    author_or_director = st.text_input(f"Enter {'Author' if item_type == 'Book' else 'Director'} Name")
-    # Usage of the one if condtion to update the correct dataframe.
+    st.subheader("Add New Item")
+    # Dropdown to select the type of item to add (Book or Movie)
+    item_type = st.selectbox("Select item type:", ["Book", "Movie"])
+    name = st.text_input(f"Enter {item_type} Name:")
+    author_or_director = st.text_input(f"Enter {'Author' if item_type == 'Book' else 'Director'}:")
+    year = st.number_input("Enter Year:", min_value=1800, max_value=2100, step=1)
+    genre = st.text_input("Enter Genre:")
+    df = pd.DataFrame()
     if st.button(f"Add {item_type}"):
-        if name and author_or_director:
-            df = st.session_state.books_df if item_type == 'Book' else st.session_state.movies_df
-            new_entry = {'name': name, 'available': True}
-            if item_type == 'Book':
+        if name == "" or author_or_director == "":
+            st.error(f"Please fill out all required fields for the {item_type}.")
+            new_entry = {
+                'name': name,
+                'year': year,
+                'genre': genre
+            }
+            if item_type == "Book":
                 new_entry['author'] = author_or_director
             else:
                 new_entry['director'] = author_or_director
-            
-            df = df.append(new_entry, ignore_index=True)
-            update_dataframe('books_df' if item_type == 'Book' else 'movies_df', df)
+            df = pd.concat([df, pd.DataFrame([new_entry])], ignore_index=True)
+            update_dataframe('books_df' if item_type == 'Book' else 'movies_df')
             st.success(f"{item_type} '{name}' added successfully!")
-        else:
-            st.error("Please fill all fields.")
+
 
 # Update item (Admin only)
 @role_required('admin')
